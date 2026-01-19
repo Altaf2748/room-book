@@ -13,6 +13,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuthContext } from '@/contexts/AuthContext';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -25,6 +28,9 @@ const navLinks = [
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  
+  const { isAuthenticated, loading } = useAuthContext();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -102,10 +108,21 @@ export function Header() {
               </span>
             </Button>
 
-            <Button variant="default" className="hidden sm:flex">
-              <User className="w-4 h-4 mr-2" />
-              Login
-            </Button>
+            {/* Auth Section */}
+            {!loading && (
+              isAuthenticated ? (
+                <UserMenu />
+              ) : (
+                <Button 
+                  variant="default" 
+                  className="hidden sm:flex"
+                  onClick={() => setIsAuthModalOpen(true)}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Login
+                </Button>
+              )
+            )}
 
             {/* Mobile Menu Toggle */}
             <Button
@@ -141,15 +158,29 @@ export function Header() {
                 </Link>
               ))}
               <div className="pt-4 border-t border-border">
-                <Button variant="default" className="w-full">
-                  <User className="w-4 h-4 mr-2" />
-                  Login / Sign Up
-                </Button>
+                {isAuthenticated ? (
+                  <UserMenu />
+                ) : (
+                  <Button 
+                    variant="default" 
+                    className="w-full"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsAuthModalOpen(true);
+                    }}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Login / Sign Up
+                  </Button>
+                )}
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Auth Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </header>
   );
 }

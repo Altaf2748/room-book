@@ -43,7 +43,7 @@ const contactInfo = [
   {
     icon: MapPin,
     title: 'Address',
-    details: ['123 Business Bay', 'Mumbai, Maharashtra 400001'],
+    details: ['123 MG Road', 'Bangalore, Karnataka 560001'],
     action: 'https://maps.google.com',
   },
   {
@@ -310,7 +310,7 @@ export default function Contact() {
                 {/* Map */}
                 <div className="bg-card rounded-2xl overflow-hidden shadow-card aspect-[4/3]">
                   <iframe
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d241317.11609823277!2d72.74109995709657!3d19.08219783958221!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7c6306644edc1%3A0x5da4ed8f8d648c69!2sMumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1640000000000!5m2!1sen!2sin"
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d248849.84916296526!2d77.49085452149498!3d12.954517008640543!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bae1670c9b44e6d%3A0xf8dfc3e8517e4fe0!2sBengaluru%2C%20Karnataka!5e0!3m2!1sen!2sin!4v1640000000000!5m2!1sen!2sin"
                     width="100%"
                     height="100%"
                     style={{ border: 0 }}

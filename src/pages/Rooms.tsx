@@ -18,7 +18,8 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Filter, X } from 'lucide-react';
 import { mockRooms } from '@/data/mockRooms';
-import { useBookingSearch } from '@/hooks/useBookingSearch';
+import { useBookingSearch, formatTime } from '@/hooks/useBookingSearch';
+import { useRoomAvailability } from '@/hooks/useRoomAvailability';
 import { FilterState } from '@/types/booking';
 
 export default function Rooms() {
@@ -90,6 +91,19 @@ export default function Rooms() {
 
     return rooms;
   }, [filters, sortBy]);
+
+  // Room availability hook
+  const { getAllRoomsAvailability, loading: availabilityLoading } = useRoomAvailability({
+    date: searchParams.date,
+    startTime: searchParams.startTime,
+    durationHours: searchParams.hours,
+  });
+
+  // Get availability status for all rooms
+  const roomAvailability = useMemo(() => {
+    const roomIds = filteredRooms.map((room) => room.id);
+    return getAllRoomsAvailability(roomIds);
+  }, [filteredRooms, getAllRoomsAvailability]);
 
   const handleFilterChange = (updates: Partial<FilterState>) => {
     setFilters((prev) => ({ ...prev, ...updates }));
@@ -265,15 +279,29 @@ export default function Rooms() {
                 {/* Room Grid */}
                 {filteredRooms.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 stagger-fade-in">
-                    {filteredRooms.map((room) => (
-                      <RoomCard
-                        key={room.id}
-                        room={room}
-                        selectedHours={searchParams.hours}
-                        onView={handleViewRoom}
-                        onBook={handleBookRoom}
-                      />
-                    ))}
+                    {filteredRooms.map((room) => {
+                      const availability = roomAvailability.get(room.id);
+                      const isBooked = availability ? !availability.isAvailable : false;
+                      
+                      // Calculate next available slot if booked
+                      let nextAvailableSlot: string | undefined;
+                      if (isBooked && availability?.conflictingSlots.length) {
+                        const lastBooking = availability.conflictingSlots[availability.conflictingSlots.length - 1];
+                        nextAvailableSlot = formatTime(lastBooking.endTime);
+                      }
+                      
+                      return (
+                        <RoomCard
+                          key={room.id}
+                          room={room}
+                          selectedHours={searchParams.hours}
+                          onView={handleViewRoom}
+                          onBook={handleBookRoom}
+                          isBooked={isBooked}
+                          nextAvailableSlot={nextAvailableSlot}
+                        />
+                      );
+                    })}
                   </div>
                 ) : (
                   <motion.div

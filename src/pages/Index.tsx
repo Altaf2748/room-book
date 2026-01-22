@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SlidersHorizontal, ArrowDownUp, ChevronDown } from 'lucide-react';
@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useBookingSearch } from '@/hooks/useBookingSearch';
+import { useBookingSearch, formatTime } from '@/hooks/useBookingSearch';
+import { useRoomAvailability } from '@/hooks/useRoomAvailability';
 import { mockRooms } from '@/data/mockRooms';
 import { Room, FilterState } from '@/types/booking';
 import heroImage from '@/assets/hero-hotel.jpg';
@@ -95,8 +96,21 @@ const Index = () => {
     getActiveFilterCount,
   } = useBookingSearch();
 
+  // Room availability hook
+  const { getAllRoomsAvailability, loading: availabilityLoading } = useRoomAvailability({
+    date: searchParams.date,
+    startTime: searchParams.startTime,
+    durationHours: searchParams.hours,
+  });
+
   const filteredRooms = sortRooms(filterRooms(mockRooms, filters), sortBy);
   const activeFilterCount = getActiveFilterCount();
+
+  // Get availability status for all rooms
+  const roomAvailability = useMemo(() => {
+    const roomIds = filteredRooms.map((room) => room.id);
+    return getAllRoomsAvailability(roomIds);
+  }, [filteredRooms, getAllRoomsAvailability]);
 
   const handleSearch = () => {
     // In production, this would trigger an API call
@@ -293,15 +307,29 @@ const Index = () => {
               {/* Room Grid */}
               {filteredRooms.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 stagger-fade-in">
-                  {filteredRooms.map((room) => (
-                    <RoomCard
-                      key={room.id}
-                      room={room}
-                      selectedHours={searchParams.hours}
-                      onView={handleViewRoom}
-                      onBook={handleBookRoom}
-                    />
-                  ))}
+                  {filteredRooms.map((room) => {
+                    const availability = roomAvailability.get(room.id);
+                    const isBooked = availability ? !availability.isAvailable : false;
+                    
+                    // Calculate next available slot if booked
+                    let nextAvailableSlot: string | undefined;
+                    if (isBooked && availability?.conflictingSlots.length) {
+                      const lastBooking = availability.conflictingSlots[availability.conflictingSlots.length - 1];
+                      nextAvailableSlot = formatTime(lastBooking.endTime);
+                    }
+                    
+                    return (
+                      <RoomCard
+                        key={room.id}
+                        room={room}
+                        selectedHours={searchParams.hours}
+                        onView={handleViewRoom}
+                        onBook={handleBookRoom}
+                        isBooked={isBooked}
+                        nextAvailableSlot={nextAvailableSlot}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <motion.div

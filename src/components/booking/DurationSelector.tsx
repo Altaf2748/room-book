@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
@@ -34,49 +35,78 @@ export function DurationSelector({ value, onChange, className }: DurationSelecto
   };
 
   return (
-    <div className={cn('space-y-3', className)}>
-      <label className="text-sm font-medium text-foreground">Duration</label>
+    <div className={cn('group', className)}>
+      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2.5 block">
+        Duration
+      </label>
       
-      <div className="flex flex-wrap gap-2">
-        {presets.map((hours) => (
-          <motion.button
-            key={hours}
-            type="button"
-            onClick={() => handlePresetClick(hours)}
-            className={cn(
-              'duration-pill',
-              value === hours && !isCustom && 'active'
-            )}
-            whileTap={{ scale: 0.95 }}
-          >
-            {hours} hrs
-          </motion.button>
-        ))}
-        
-        <div className="relative">
-          <Input
-            type="number"
-            min={3}
-            value={customValue}
-            onChange={(e) => handleCustomChange(e.target.value)}
-            onFocus={handleCustomFocus}
-            placeholder="Custom"
-            className={cn(
-              'w-24 h-10 text-center rounded-full text-sm',
-              isCustom && 'ring-2 ring-accent border-accent'
-            )}
-          />
-          {isCustom && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              hrs
+      <div className={cn(
+        'px-4 py-3 rounded-2xl transition-all duration-300',
+        'bg-background/80 border-2 border-transparent',
+        'group-hover:border-accent/30 group-hover:bg-background',
+        'group-hover:shadow-lg group-hover:shadow-accent/5'
+      )}>
+        {/* Icon and label */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-accent" />
+          </div>
+          <div>
+            <span className="block text-lg font-semibold text-foreground">
+              {value} hours
             </span>
-          )}
+            <span className="text-sm text-muted-foreground">Stay duration</span>
+          </div>
         </div>
+
+        {/* Preset pills */}
+        <div className="flex flex-wrap gap-2">
+          {presets.map((hours) => (
+            <motion.button
+              key={hours}
+              type="button"
+              onClick={() => handlePresetClick(hours)}
+              className={cn(
+                'px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200',
+                'border-2',
+                value === hours && !isCustom 
+                  ? 'bg-accent text-accent-foreground border-accent shadow-lg shadow-accent/20' 
+                  : 'bg-background border-border hover:border-accent/50 hover:bg-accent/5'
+              )}
+              whileTap={{ scale: 0.95 }}
+            >
+              {hours}h
+            </motion.button>
+          ))}
+          
+          {/* Custom input */}
+          <div className="relative">
+            <Input
+              type="number"
+              min={3}
+              value={customValue}
+              onChange={(e) => handleCustomChange(e.target.value)}
+              onFocus={handleCustomFocus}
+              placeholder="Custom"
+              className={cn(
+                'w-20 h-10 text-center rounded-xl text-sm border-2 bg-background',
+                isCustom 
+                  ? 'border-accent ring-2 ring-accent/20' 
+                  : 'border-border hover:border-accent/50'
+              )}
+            />
+            {isCustom && (
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                h
+              </span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground mt-3">
+          Min. 3 hours • Discounts for 6h+
+        </p>
       </div>
-      
-      <p className="text-xs text-muted-foreground">
-        Minimum booking: 3 hours
-      </p>
     </div>
   );
 }

@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      bookings: {
+        Row: {
+          booking_date: string
+          created_at: string
+          deposit_amount: number
+          discount: number
+          duration_hours: number
+          end_time: string
+          guests: number
+          id: string
+          payment_status: string
+          room_id: string
+          service_fee: number
+          start_time: string
+          status: string
+          subtotal: number
+          taxes: number
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          booking_date: string
+          created_at?: string
+          deposit_amount: number
+          discount?: number
+          duration_hours: number
+          end_time: string
+          guests?: number
+          id?: string
+          payment_status?: string
+          room_id: string
+          service_fee: number
+          start_time: string
+          status?: string
+          subtotal: number
+          taxes: number
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          booking_date?: string
+          created_at?: string
+          deposit_amount?: number
+          discount?: number
+          duration_hours?: number
+          end_time?: string
+          guests?: number
+          id?: string
+          payment_status?: string
+          room_id?: string
+          service_fee?: number
+          start_time?: string
+          status?: string
+          subtotal?: number
+          taxes?: number
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

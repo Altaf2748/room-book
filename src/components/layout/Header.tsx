@@ -47,7 +47,7 @@ export function Header() {
         <div className="container flex items-center justify-between h-9 text-xs">
           <button className="flex items-center gap-1.5 hover:text-accent transition-colors">
             <MapPin className="w-3.5 h-3.5" />
-            <span>Mumbai</span>
+            <span>Bangalore</span>
             <ChevronDown className="w-3 h-3" />
           </button>
           

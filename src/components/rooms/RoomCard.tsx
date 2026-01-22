@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Star, Users, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Star, Users, ChevronLeft, ChevronRight, Zap, Clock, AlertCircle } from 'lucide-react';
 import { Room } from '@/types/booking';
 import { calculatePrice } from '@/hooks/useBookingSearch';
 import { Button } from '@/components/ui/button';
@@ -13,9 +13,18 @@ interface RoomCardProps {
   selectedHours: number;
   onView: (id: string) => void;
   onBook: (id: string) => void;
+  isBooked?: boolean;
+  nextAvailableSlot?: string;
 }
 
-export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps) {
+export function RoomCard({ 
+  room, 
+  selectedHours, 
+  onView, 
+  onBook, 
+  isBooked = false,
+  nextAvailableSlot 
+}: RoomCardProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   
@@ -34,7 +43,10 @@ export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps)
 
   return (
     <motion.article
-      className="group relative bg-card rounded-2xl overflow-hidden shadow-card card-hover cursor-pointer"
+      className={cn(
+        'group relative bg-card rounded-2xl overflow-hidden shadow-card card-hover cursor-pointer',
+        isBooked && 'opacity-75'
+      )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onView(room.id)}
@@ -49,14 +61,34 @@ export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps)
           key={currentImageIndex}
           src={room.images[currentImageIndex]}
           alt={`${room.name} - Image ${currentImageIndex + 1}`}
-          className="w-full h-full object-cover"
+          className={cn(
+            'w-full h-full object-cover',
+            isBooked && 'grayscale-[30%]'
+          )}
           initial={{ opacity: 0.8 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         />
         
+        {/* Booked Overlay */}
+        {isBooked && (
+          <div className="absolute inset-0 bg-foreground/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-10">
+            <div className="bg-destructive/90 text-destructive-foreground px-6 py-3 rounded-xl shadow-xl">
+              <div className="flex items-center gap-2 font-semibold">
+                <AlertCircle className="w-5 h-5" />
+                <span>Booked for this slot</span>
+              </div>
+            </div>
+            {nextAvailableSlot && (
+              <p className="mt-3 text-sm text-white bg-black/50 px-4 py-2 rounded-lg">
+                Next available: {nextAvailableSlot}
+              </p>
+            )}
+          </div>
+        )}
+        
         {/* Image Navigation */}
-        {room.images.length > 1 && isHovered && (
+        {room.images.length > 1 && isHovered && !isBooked && (
           <>
             <button
               onClick={prevImage}
@@ -76,7 +108,7 @@ export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps)
         )}
         
         {/* Image Dots */}
-        {room.images.length > 1 && (
+        {room.images.length > 1 && !isBooked && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
             {room.images.map((_, idx) => (
               <span
@@ -93,23 +125,25 @@ export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps)
         )}
         
         {/* Badges */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-          {room.badges?.map((badge) => (
-            <Badge 
-              key={badge} 
-              variant={badge === 'Premium' ? 'default' : 'secondary'}
-              className={cn(
-                'text-xs font-medium',
-                badge === 'Premium' && 'bg-gradient-to-r from-accent to-gold-dark text-white border-0'
-              )}
-            >
-              {badge}
-            </Badge>
-          ))}
-        </div>
+        {!isBooked && (
+          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
+            {room.badges?.map((badge) => (
+              <Badge 
+                key={badge} 
+                variant={badge === 'Premium' ? 'default' : 'secondary'}
+                className={cn(
+                  'text-xs font-medium',
+                  badge === 'Premium' && 'bg-gradient-to-r from-accent to-gold-dark text-white border-0'
+                )}
+              >
+                {badge}
+              </Badge>
+            ))}
+          </div>
+        )}
         
         {/* Instant Book */}
-        {room.isInstantBook && (
+        {room.isInstantBook && !isBooked && (
           <div className="absolute top-3 right-3">
             <div className="bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
               <Zap className="w-3 h-3" />
@@ -172,24 +206,37 @@ export function RoomCard({ room, selectedHours, onView, onBook }: RoomCardProps)
             </p>
           </div>
           
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              onBook(room.id);
-            }}
-            className="bg-primary hover:bg-primary/90"
-          >
-            Book Now
-          </Button>
+          {isBooked ? (
+            <Button
+              variant="outline"
+              className="opacity-50 cursor-not-allowed"
+              disabled
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Unavailable
+            </Button>
+          ) : (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onBook(room.id);
+              }}
+              className="bg-primary hover:bg-primary/90"
+            >
+              Book Now
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Hover Overlay */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: isHovered ? 1 : 0 }}
-        className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent pointer-events-none"
-      />
+      {!isBooked && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          className="absolute inset-0 bg-gradient-to-t from-primary/20 to-transparent pointer-events-none"
+        />
+      )}
     </motion.article>
   );
 }

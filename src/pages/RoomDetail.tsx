@@ -89,7 +89,7 @@ export default function RoomDetail() {
 
   const handleBook = () => {
     // Navigate to checkout
-    navigate(`/booking/checkout?room=${room.id}&date=${format(date, 'yyyy-MM-dd')}&time=${startTime}&hours=${hours}&guests=${guests}`);
+    navigate(`/checkout?room=${room.id}&date=${format(date, 'yyyy-MM-dd')}&time=${startTime}&hours=${hours}&guests=${guests}`);
   };
 
   return (

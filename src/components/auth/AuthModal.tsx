@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Loader2, Shield, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { validateEmail } from '@/utils/emailValidation';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuthContext();
 
@@ -34,6 +36,26 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setShowPassword(false);
     setAcceptTerms(false);
     setEmailSent(false);
+    setEmailError(null);
+  };
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    
+    // Clear error when user starts typing
+    if (emailError) {
+      setEmailError(null);
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (email.trim()) {
+      const validation = validateEmail(email.trim());
+      if (!validation.isValid) {
+        setEmailError(validation.error || 'Invalid email');
+      }
+    }
   };
 
   const handleClose = () => {
@@ -47,6 +69,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     if (!email.trim() || !password.trim()) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Validate email format and check for disposable emails
+    const emailValidation = validateEmail(email.trim());
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error || 'Invalid email');
+      toast.error(emailValidation.error || 'Invalid email');
       return;
     }
     
@@ -68,6 +98,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Validate email format and check for disposable emails
+    const emailValidation = validateEmail(email.trim());
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error || 'Invalid email');
+      toast.error(emailValidation.error || 'Invalid email');
       return;
     }
     
@@ -103,6 +141,14 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     if (!email.trim()) {
       toast.error('Please enter your email');
+      return;
+    }
+
+    // Validate email format and check for disposable emails
+    const emailValidation = validateEmail(email.trim());
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error || 'Invalid email');
+      toast.error(emailValidation.error || 'Invalid email');
       return;
     }
     
@@ -264,14 +310,21 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                             <Input
                               id="login-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder="you@gmail.com"
                               value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="pl-10 h-11 sm:h-12"
+                              onChange={handleEmailChange}
+                              onBlur={handleEmailBlur}
+                              className={`pl-10 h-11 sm:h-12 ${emailError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                               autoComplete="email"
                               required
                             />
                           </div>
+                          {emailError && (
+                            <div className="flex items-center gap-1.5 text-destructive text-xs">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>{emailError}</span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -340,14 +393,24 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                             <Input
                               id="signup-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder="you@gmail.com"
                               value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="pl-10 h-11 sm:h-12"
+                              onChange={handleEmailChange}
+                              onBlur={handleEmailBlur}
+                              className={`pl-10 h-11 sm:h-12 ${emailError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                               autoComplete="email"
                               required
                             />
                           </div>
+                          {emailError && (
+                            <div className="flex items-center gap-1.5 text-destructive text-xs">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>{emailError}</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Use a valid email (Gmail, Outlook, Yahoo, etc.)
+                          </p>
                         </div>
 
                         <div className="space-y-2">
@@ -410,14 +473,21 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                             <Input
                               id="reset-email"
                               type="email"
-                              placeholder="you@example.com"
+                              placeholder="you@gmail.com"
                               value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="pl-10 h-11 sm:h-12"
+                              onChange={handleEmailChange}
+                              onBlur={handleEmailBlur}
+                              className={`pl-10 h-11 sm:h-12 ${emailError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                               autoComplete="email"
                               required
                             />
                           </div>
+                          {emailError && (
+                            <div className="flex items-center gap-1.5 text-destructive text-xs">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              <span>{emailError}</span>
+                            </div>
+                          )}
                         </div>
 
                         <Button type="submit" className="w-full h-11 sm:h-12" disabled={isLoading}>

@@ -102,6 +102,41 @@ export default function Checkout() {
     }
   }, [isAuthenticated, authLoading, profile, user]);
 
+  // Send confirmation email
+  const sendConfirmationEmail = async (newBookingId: string) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-booking-confirmation`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            email: guestDetails.email,
+            guestName: guestDetails.fullName,
+            roomName: room?.name || 'Room',
+            bookingDate: bookingDate,
+            startTime: startTime,
+            endTime: endTime,
+            duration: hours,
+            guests: guests,
+            totalAmount: priceDetails?.total || 0,
+            depositPaid: priceDetails?.deposit || 0,
+            bookingId: newBookingId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Failed to send confirmation email');
+      }
+    } catch (error) {
+      console.error('Error sending confirmation email:', error);
+    }
+  };
+
   // Handle booking submission
   const handleConfirmBooking = async () => {
     if (!room || !user || !priceDetails || !bookingDate) return;
@@ -139,8 +174,12 @@ export default function Checkout() {
       if (error) throw error;
 
       setBookingId(data.id);
+      
+      // Send confirmation email in background
+      sendConfirmationEmail(data.id);
+      
       setCurrentStep('confirmation');
-      toast.success('Booking confirmed successfully!');
+      toast.success('Booking confirmed! A confirmation email has been sent.');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create booking');
     } finally {

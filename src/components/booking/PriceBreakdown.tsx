@@ -13,10 +13,11 @@ interface PriceBreakdownProps {
   hours: number;
   className?: string;
   showDeposit?: boolean;
+  paymentOption?: 'full' | 'partial';
 }
 
-export function PriceBreakdown({ baseRate, hours, className, showDeposit = true }: PriceBreakdownProps) {
-  const { subtotal, discount, taxes, serviceFee, total, deposit } = calculatePrice(baseRate, hours);
+export function PriceBreakdown({ baseRate, hours, className, showDeposit = true, paymentOption = 'partial' }: PriceBreakdownProps) {
+  const { subtotal, discount, taxes, serviceFee, total, payNow, payLater } = calculatePrice(baseRate, hours, paymentOption);
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -68,28 +69,30 @@ export function PriceBreakdown({ baseRate, hours, className, showDeposit = true 
         <div className="bg-accent/10 rounded-xl p-4 mt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-accent">Pay now</span>
+              <span className="font-medium text-accent">Pay now ({paymentOption === 'full' ? '100%' : '40%'})</span>
               <Tooltip>
                 <TooltipTrigger>
                   <Info className="w-4 h-4 text-muted-foreground" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[250px]">
-                  <p>Deposit secures your booking. Remainder due at check-in or auto-charged 2 hours before start.</p>
+                  <p>{paymentOption === 'full' ? 'Full payment - nothing due at check-in.' : 'Deposit secures your booking. Remainder due at check-in or auto-charged 2 hours before start.'}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <motion.span
-              key={deposit}
+              key={payNow}
               initial={{ scale: 1.05 }}
               animate={{ scale: 1 }}
               className="font-bold text-lg text-accent"
             >
-              ₹{deposit.toLocaleString('en-IN')}
+              ₹{payNow.toLocaleString('en-IN')}
             </motion.span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            30% deposit (min ₹500) • Remainder: ₹{(total - deposit).toLocaleString('en-IN')}
-          </p>
+          {payLater > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Remainder: ₹{payLater.toLocaleString('en-IN')} due at check-in
+            </p>
+          )}
         </div>
       )}
     </div>

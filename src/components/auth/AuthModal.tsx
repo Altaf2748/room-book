@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, Eye, EyeOff, Loader2, Shield, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Loader2, Shield, AlertCircle, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { validateEmail } from '@/utils/emailValidation';
@@ -14,7 +15,12 @@ interface AuthModalProps {
   onClose: () => void;
 }
 
-type AuthMode = 'login' | 'signup' | 'forgot-password';
+type AuthMode = 'login' | 'signup' | 'forgot-password' | 'verify-otp';
+
+// Generate a 6-digit OTP
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [mode, setMode] = useState<AuthMode>('login');
@@ -26,8 +32,23 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  
+  // OTP verification states
+  const [otp, setOtp] = useState('');
+  const [generatedOtp, setGeneratedOtp] = useState<string | null>(null);
+  const [otpSentAt, setOtpSentAt] = useState<Date | null>(null);
+  const [pendingAction, setPendingAction] = useState<'login' | 'signup' | null>(null);
+  const [otpResendCooldown, setOtpResendCooldown] = useState(0);
 
   const { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } = useAuthContext();
+
+  // Handle OTP resend cooldown timer
+  useEffect(() => {
+    if (otpResendCooldown > 0) {
+      const timer = setTimeout(() => setOtpResendCooldown(otpResendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpResendCooldown]);
 
   const resetForm = () => {
     setEmail('');
@@ -37,6 +58,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setAcceptTerms(false);
     setEmailSent(false);
     setEmailError(null);
+    setOtp('');
+    setGeneratedOtp(null);
+    setOtpSentAt(null);
+    setPendingAction(null);
+    setOtpResendCooldown(0);
   };
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,6 +90,37 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     onClose();
   };
 
+  // Send OTP via edge function
+  const sendOtpEmail = async (targetEmail: string, otpCode: string): Promise<boolean> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            email: targetEmail,
+            otp: otpCode,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send OTP');
+      }
+
+      return true;
+    } catch (error: any) {
+      console.error('Failed to send OTP:', error);
+      toast.error('Failed to send verification code. Please try again.');
+      return false;
+    }
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -82,14 +139,19 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     
     setIsLoading(true);
 
-    const { error } = await signInWithEmail(email.trim(), password);
-
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Welcome back!');
-      handleClose();
+    // Generate and send OTP
+    const newOtp = generateOTP();
+    const sent = await sendOtpEmail(email.trim(), newOtp);
+    
+    if (sent) {
+      setGeneratedOtp(newOtp);
+      setOtpSentAt(new Date());
+      setPendingAction('login');
+      setMode('verify-otp');
+      setOtpResendCooldown(60);
+      toast.success('Verification code sent to your email!');
     }
+    
     setIsLoading(false);
   };
 
@@ -121,18 +183,84 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     setIsLoading(true);
 
-    const { data, error } = await signUpWithEmail(email.trim(), password, fullName.trim());
-
-    if (error) {
-      toast.error(error.message);
-    } else if (data?.user) {
-      // Auto-confirm is enabled, so user is logged in immediately
-      toast.success('Account created successfully! Welcome to Staycation.');
-      handleClose();
-    } else {
-      setEmailSent(true);
-      toast.success('Verification email sent! Please check your inbox.');
+    // Generate and send OTP
+    const newOtp = generateOTP();
+    const sent = await sendOtpEmail(email.trim(), newOtp);
+    
+    if (sent) {
+      setGeneratedOtp(newOtp);
+      setOtpSentAt(new Date());
+      setPendingAction('signup');
+      setMode('verify-otp');
+      setOtpResendCooldown(60);
+      toast.success('Verification code sent to your email!');
     }
+    
+    setIsLoading(false);
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) {
+      toast.error('Please enter the complete 6-digit code');
+      return;
+    }
+
+    // Check if OTP has expired (10 minutes)
+    if (otpSentAt && new Date().getTime() - otpSentAt.getTime() > 10 * 60 * 1000) {
+      toast.error('Verification code has expired. Please request a new one.');
+      setOtp('');
+      setGeneratedOtp(null);
+      return;
+    }
+
+    if (otp !== generatedOtp) {
+      toast.error('Invalid verification code. Please try again.');
+      setOtp('');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (pendingAction === 'login') {
+        const { error } = await signInWithEmail(email.trim(), password);
+        if (error) {
+          toast.error(error.message);
+        } else {
+          toast.success('Welcome back!');
+          handleClose();
+        }
+      } else if (pendingAction === 'signup') {
+        const { data, error } = await signUpWithEmail(email.trim(), password, fullName.trim());
+        if (error) {
+          toast.error(error.message);
+        } else if (data?.user) {
+          toast.success('Account created successfully! Welcome to Staycation.');
+          handleClose();
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpResendCooldown > 0) return;
+    
+    setIsLoading(true);
+    const newOtp = generateOTP();
+    const sent = await sendOtpEmail(email.trim(), newOtp);
+    
+    if (sent) {
+      setGeneratedOtp(newOtp);
+      setOtpSentAt(new Date());
+      setOtp('');
+      setOtpResendCooldown(60);
+      toast.success('New verification code sent!');
+    }
+    
     setIsLoading(false);
   };
 
@@ -227,11 +355,13 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     {mode === 'login' && 'Welcome Back'}
                     {mode === 'signup' && 'Create Account'}
                     {mode === 'forgot-password' && 'Reset Password'}
+                    {mode === 'verify-otp' && 'Verify Email'}
                   </h2>
                   <p className="text-muted-foreground text-sm mt-2">
                     {mode === 'login' && 'Sign in to continue your booking'}
                     {mode === 'signup' && 'Join us for exclusive deals'}
                     {mode === 'forgot-password' && "We'll send you a reset link"}
+                    {mode === 'verify-otp' && 'Enter the code sent to your email'}
                   </p>
                 </div>
 
@@ -242,7 +372,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">Check your email</h3>
                     <p className="text-muted-foreground text-sm mb-6">
-                      We've sent a {mode === 'signup' ? 'verification' : 'password reset'} link to{' '}
+                      We've sent a password reset link to{' '}
                       <span className="font-medium text-foreground">{email}</span>
                     </p>
                     <Button
@@ -253,6 +383,75 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                       }}
                     >
                       Back to Login
+                    </Button>
+                  </div>
+                ) : mode === 'verify-otp' ? (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-accent/10 flex items-center justify-center">
+                        <KeyRound className="w-8 h-8 text-accent" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Code sent to <span className="font-medium text-foreground">{email}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex justify-center">
+                      <InputOTP
+                        maxLength={6}
+                        value={otp}
+                        onChange={setOtp}
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+
+                    <Button 
+                      className="w-full h-11 sm:h-12" 
+                      onClick={handleVerifyOtp}
+                      disabled={isLoading || otp.length !== 6}
+                    >
+                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify & Continue'}
+                    </Button>
+
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Didn't receive the code?{' '}
+                        {otpResendCooldown > 0 ? (
+                          <span className="text-muted-foreground">
+                            Resend in {otpResendCooldown}s
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleResendOtp}
+                            className="text-accent hover:underline font-medium"
+                            disabled={isLoading}
+                          >
+                            Resend Code
+                          </button>
+                        )}
+                      </p>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => {
+                        setMode(pendingAction === 'signup' ? 'signup' : 'login');
+                        setOtp('');
+                        setGeneratedOtp(null);
+                      }}
+                    >
+                      Back
                     </Button>
                   </div>
                 ) : (

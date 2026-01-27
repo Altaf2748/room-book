@@ -17,6 +17,8 @@ import {
   Mail,
   User,
   AlertCircle,
+  Wallet,
+  Percent,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -36,6 +38,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 type CheckoutStep = 'auth' | 'details' | 'payment' | 'confirmation';
+type PaymentOption = 'full' | 'partial';
 
 export default function Checkout() {
   const navigate = useNavigate();
@@ -56,6 +59,7 @@ export default function Checkout() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('razorpay');
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>('partial');
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   
@@ -75,7 +79,7 @@ export default function Checkout() {
   };
 
   const endTime = calculateEndTime(startTime, hours);
-  const priceDetails = room ? calculatePrice(room.baseHourlyRate, hours) : null;
+  const priceDetails = room ? calculatePrice(room.baseHourlyRate, hours, paymentOption) : null;
 
   // Update step based on auth state
   useEffect(() => {
@@ -123,7 +127,7 @@ export default function Checkout() {
             duration: hours,
             guests: guests,
             totalAmount: priceDetails?.total || 0,
-            depositPaid: priceDetails?.deposit || 0,
+            depositPaid: priceDetails?.payNow || 0,
             bookingId: newBookingId,
           }),
         }
@@ -164,9 +168,9 @@ export default function Checkout() {
           taxes: priceDetails.taxes,
           service_fee: priceDetails.serviceFee,
           total_amount: priceDetails.total,
-          deposit_amount: priceDetails.deposit,
+          deposit_amount: priceDetails.payNow,
           status: 'confirmed',
-          payment_status: 'deposit_paid',
+          payment_status: paymentOption === 'full' ? 'paid' : 'deposit_paid',
         })
         .select()
         .single();
@@ -430,6 +434,74 @@ export default function Checkout() {
                     exit={{ opacity: 0, y: -20 }}
                     className="space-y-6"
                   >
+                    {/* Payment Option Selection */}
+                    <div className="bg-card rounded-2xl border border-border p-6">
+                      <h2 className="text-xl font-display font-semibold mb-6 flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-accent" />
+                        Choose Payment Option
+                      </h2>
+                      
+                      <RadioGroup value={paymentOption} onValueChange={(v) => setPaymentOption(v as PaymentOption)}>
+                        <div className="space-y-3">
+                          <label
+                            className={cn(
+                              'flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all',
+                              paymentOption === 'partial' 
+                                ? 'border-accent bg-accent/5' 
+                                : 'border-border hover:border-accent/50'
+                            )}
+                          >
+                            <RadioGroupItem value="partial" className="mt-1" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">Pay 40% Now</span>
+                                <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Pay ₹{priceDetails ? calculatePrice(room.baseHourlyRate, hours, 'partial').payNow.toLocaleString('en-IN') : '---'} now, 
+                                remaining ₹{priceDetails ? calculatePrice(room.baseHourlyRate, hours, 'partial').payLater.toLocaleString('en-IN') : '---'} at check-in
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-lg text-accent">
+                                ₹{priceDetails ? calculatePrice(room.baseHourlyRate, hours, 'partial').payNow.toLocaleString('en-IN') : '---'}
+                              </span>
+                              <p className="text-xs text-muted-foreground">now</p>
+                            </div>
+                          </label>
+
+                          <label
+                            className={cn(
+                              'flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all',
+                              paymentOption === 'full' 
+                                ? 'border-accent bg-accent/5' 
+                                : 'border-border hover:border-accent/50'
+                            )}
+                          >
+                            <RadioGroupItem value="full" className="mt-1" />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">Pay Full Amount</span>
+                                <Badge variant="outline" className="text-xs text-green-600 border-green-600">
+                                  <Percent className="w-3 h-3 mr-1" />
+                                  No balance at check-in
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Complete payment now - nothing due at check-in
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-lg">
+                                ₹{priceDetails?.total.toLocaleString('en-IN') || '---'}
+                              </span>
+                              <p className="text-xs text-muted-foreground">total</p>
+                            </div>
+                          </label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+
                     {/* Payment Methods */}
                     <div className="bg-card rounded-2xl border border-border p-6">
                       <h2 className="text-xl font-display font-semibold mb-6 flex items-center gap-2">
@@ -524,9 +596,15 @@ export default function Checkout() {
                           <a href="/terms" className="text-accent hover:underline">Terms of Service</a>,{' '}
                           <a href="/privacy" className="text-accent hover:underline">Privacy Policy</a>, and{' '}
                           <a href="/cancellation" className="text-accent hover:underline">Cancellation Policy</a>. 
-                          I understand that a deposit of ₹{priceDetails?.deposit.toLocaleString('en-IN')} will be charged now, 
-                          and the remaining balance of ₹{((priceDetails?.total || 0) - (priceDetails?.deposit || 0)).toLocaleString('en-IN')} 
-                          will be due at check-in.
+                          {paymentOption === 'partial' ? (
+                            <>
+                              {' '}I understand that a deposit of ₹{priceDetails?.payNow.toLocaleString('en-IN')} will be charged now, 
+                              and the remaining balance of ₹{priceDetails?.payLater.toLocaleString('en-IN')} 
+                              will be due at check-in.
+                            </>
+                          ) : (
+                            <> I understand that the full amount of ₹{priceDetails?.total.toLocaleString('en-IN')} will be charged now.</>
+                          )}
                         </label>
                       </div>
                     </div>
@@ -558,7 +636,7 @@ export default function Checkout() {
                             Processing...
                           </>
                         ) : (
-                          <>Pay ₹{priceDetails?.deposit.toLocaleString('en-IN')} Now</>
+                          <>Pay ₹{priceDetails?.payNow.toLocaleString('en-IN')} Now</>
                         )}
                       </Button>
                     </div>
@@ -619,13 +697,15 @@ export default function Checkout() {
                         </div>
                         <Separator />
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Deposit Paid</span>
-                          <span className="font-medium text-green-600">₹{priceDetails?.deposit.toLocaleString('en-IN')}</span>
+                          <span className="text-muted-foreground">Amount Paid</span>
+                          <span className="font-medium text-green-600">₹{priceDetails?.payNow.toLocaleString('en-IN')}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Balance Due</span>
-                          <span>₹{((priceDetails?.total || 0) - (priceDetails?.deposit || 0)).toLocaleString('en-IN')}</span>
-                        </div>
+                        {priceDetails && priceDetails.payLater > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Balance Due</span>
+                            <span>₹{priceDetails.payLater.toLocaleString('en-IN')}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -634,7 +714,9 @@ export default function Checkout() {
                       <ul className="text-sm text-muted-foreground space-y-1">
                         <li>• Arrive at the hotel reception at your scheduled time</li>
                         <li>• Present your booking confirmation and government ID</li>
-                        <li>• Complete balance payment at the front desk</li>
+                        {priceDetails && priceDetails.payLater > 0 && (
+                          <li>• Complete balance payment of ₹{priceDetails.payLater.toLocaleString('en-IN')} at the front desk</li>
+                        )}
                         <li>• Collect your room key and enjoy your stay!</li>
                       </ul>
                     </div>
@@ -742,14 +824,18 @@ export default function Checkout() {
 
                       <div className="bg-accent/10 rounded-xl p-4 mt-4">
                         <div className="flex justify-between items-center">
-                          <span className="font-medium text-accent">Pay Now (30%)</span>
+                          <span className="font-medium text-accent">
+                            Pay Now ({paymentOption === 'full' ? '100%' : '40%'})
+                          </span>
                           <span className="font-bold text-lg text-accent">
-                            ₹{priceDetails.deposit.toLocaleString('en-IN')}
+                            ₹{priceDetails.payNow.toLocaleString('en-IN')}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Remaining ₹{(priceDetails.total - priceDetails.deposit).toLocaleString('en-IN')} due at check-in
-                        </p>
+                        {priceDetails.payLater > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Remaining ₹{priceDetails.payLater.toLocaleString('en-IN')} due at check-in
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

@@ -75,7 +75,7 @@ export function generateTimeSlots(): string[] {
   return slots;
 }
 
-export function calculatePrice(baseRate: number, hours: number): { subtotal: number; discount: number; taxes: number; serviceFee: number; total: number; deposit: number } {
+export function calculatePrice(baseRate: number, hours: number, paymentOption: 'full' | 'partial' = 'partial'): { subtotal: number; discount: number; taxes: number; serviceFee: number; total: number; deposit: number; payNow: number; payLater: number } {
   const subtotal = baseRate * hours;
   
   // Duration discounts
@@ -90,8 +90,14 @@ export function calculatePrice(baseRate: number, hours: number): { subtotal: num
   const serviceFee = 99; // Fixed service fee
   const total = afterDiscount + taxes + serviceFee;
   
-  // Deposit: 30% or minimum ₹500
-  const deposit = Math.max(500, Math.round(total * 0.30));
+  // Payment calculation based on option
+  // Full: pay 100% now, Partial: pay 40% now (min ₹500)
+  const deposit = paymentOption === 'full' 
+    ? total 
+    : Math.max(500, Math.round(total * 0.40));
   
-  return { subtotal, discount, taxes, serviceFee, total, deposit };
+  const payNow = deposit;
+  const payLater = total - deposit;
+  
+  return { subtotal, discount, taxes, serviceFee, total, deposit, payNow, payLater };
 }

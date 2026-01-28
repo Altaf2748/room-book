@@ -7,6 +7,7 @@ interface BookedSlot {
   date: string;
   startTime: string;
   endTime: string;
+  status: string;
 }
 
 interface UseRoomAvailabilityProps {
@@ -26,16 +27,16 @@ export function useRoomAvailability({ date, startTime, durationHours }: UseRoomA
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const dateStr = format(date, 'yyyy-MM-dd');
+
   const fetchBookings = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const dateStr = format(date, 'yyyy-MM-dd');
-      
       const { data, error: fetchError } = await supabase
         .from('bookings')
-        .select('room_id, booking_date, start_time, end_time')
+        .select('room_id, booking_date, start_time, end_time, status')
         .eq('booking_date', dateStr)
         .in('status', ['confirmed', 'pending']);
       
@@ -48,6 +49,7 @@ export function useRoomAvailability({ date, startTime, durationHours }: UseRoomA
         date: booking.booking_date,
         startTime: booking.start_time,
         endTime: booking.end_time,
+        status: booking.status,
       }));
       
       setBookings(slots);
@@ -57,10 +59,32 @@ export function useRoomAvailability({ date, startTime, durationHours }: UseRoomA
     } finally {
       setLoading(false);
     }
-  }, [date]);
+  }, [dateStr]);
 
   useEffect(() => {
     fetchBookings();
+
+    // Subscribe to realtime booking changes
+    const channel = supabase
+      .channel('room-availability')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+        },
+        (payload) => {
+          console.log('Realtime booking update:', payload);
+          // Refetch bookings when any change occurs
+          fetchBookings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchBookings]);
 
   // Check if a specific room is available for the given time slot

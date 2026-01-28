@@ -74,7 +74,7 @@ export const mockRooms: Room[] = [
     name: 'Family Paradise Suite',
     description: 'Spacious suite with separate living area, perfect for families. Includes kids amenities.',
     images: [
-      'https://images.unsplash.com/photo-1598928506311-c55ez6b0c48a?w=800',
+      'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800',
       'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800',
     ],
     amenities: ['wifi', 'ac', 'tv', 'minibar', 'kitchen', 'parking', 'pool'],

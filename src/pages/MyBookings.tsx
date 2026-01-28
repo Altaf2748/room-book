@@ -1,39 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { format } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar,
-  Clock,
-  Users,
-  MapPin,
-  ChevronRight,
   Loader2,
   Hotel,
   AlertCircle,
   CheckCircle,
   XCircle,
-  Timer,
-  RefreshCw,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { supabase } from '@/integrations/supabase/client';
-import { mockRooms } from '@/data/mockRooms';
-import { cn } from '@/lib/utils';
+import { BookingCard } from '@/components/bookings/BookingCard';
 
 interface Booking {
   id: string;
@@ -50,14 +33,6 @@ interface Booking {
   created_at: string;
 }
 
-const statusConfig: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
-  confirmed: { label: 'Confirmed', color: 'bg-green-500/10 text-green-600 border-green-500/20', icon: CheckCircle },
-  pending: { label: 'Pending', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20', icon: Timer },
-  completed: { label: 'Completed', color: 'bg-blue-500/10 text-blue-600 border-blue-500/20', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-red-500/10 text-red-600 border-red-500/20', icon: XCircle },
-  refunded: { label: 'Refunded', color: 'bg-gray-500/10 text-gray-600 border-gray-500/20', icon: RefreshCw },
-};
-
 export default function MyBookings() {
   const navigate = useNavigate();
   const { user, loading: authLoading, isAuthenticated } = useAuthContext();
@@ -69,6 +44,36 @@ export default function MyBookings() {
   useEffect(() => {
     if (!authLoading && isAuthenticated && user) {
       fetchBookings();
+      
+      // Subscribe to realtime updates
+      const channel = supabase
+        .channel('bookings-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Booking update:', payload);
+            if (payload.eventType === 'UPDATE') {
+              setBookings(prev => 
+                prev.map(b => b.id === payload.new.id ? payload.new as Booking : b)
+              );
+            } else if (payload.eventType === 'INSERT') {
+              setBookings(prev => [payload.new as Booking, ...prev]);
+            } else if (payload.eventType === 'DELETE') {
+              setBookings(prev => prev.filter(b => b.id !== payload.old.id));
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else if (!authLoading && !isAuthenticated) {
       setLoading(false);
     }
@@ -94,28 +99,17 @@ export default function MyBookings() {
     }
   };
 
-  const formatTime12h = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    const period = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-  };
-
-  const getRoomDetails = (roomId: string) => {
-    return mockRooms.find(r => r.id === roomId);
-  };
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const upcomingBookings = bookings.filter(b => {
     const bookingDate = new Date(b.booking_date);
-    return bookingDate >= today && b.status !== 'cancelled';
+    return bookingDate >= today && b.status !== 'cancelled' && b.status !== 'completed';
   });
 
   const pastBookings = bookings.filter(b => {
     const bookingDate = new Date(b.booking_date);
-    return bookingDate < today || b.status === 'completed';
+    return (bookingDate < today && b.status !== 'cancelled') || b.status === 'completed';
   });
 
   const cancelledBookings = bookings.filter(b => 
@@ -171,88 +165,12 @@ export default function MyBookings() {
     );
   }
 
-  const BookingCard = ({ booking }: { booking: Booking }) => {
-    const room = getRoomDetails(booking.room_id);
-    const status = statusConfig[booking.status] || statusConfig.pending;
-    const StatusIcon = status.icon;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-card rounded-xl border border-border overflow-hidden hover:shadow-lg transition-all group"
-      >
-        <div className="flex flex-col sm:flex-row">
-          {/* Room Image */}
-          <div className="sm:w-48 h-32 sm:h-auto overflow-hidden">
-            <img
-              src={room?.images[0] || '/placeholder.svg'}
-              alt={room?.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-          
-          {/* Booking Details */}
-          <div className="flex-1 p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div>
-                <h3 className="font-display font-semibold text-lg text-foreground">
-                  {room?.name || 'Unknown Room'}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Booking #{booking.id.slice(0, 8).toUpperCase()}
-                </p>
-              </div>
-              <Badge className={cn('border', status.color)}>
-                <StatusIcon className="w-3 h-3 mr-1" />
-                {status.label}
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="w-4 h-4 shrink-0" />
-                <span>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="w-4 h-4 shrink-0" />
-                <span>{formatTime12h(booking.start_time)} - {formatTime12h(booking.end_time)}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Timer className="w-4 h-4 shrink-0" />
-                <span>{booking.duration_hours}h</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="w-4 h-4 shrink-0" />
-                <span>{booking.guests} {booking.guests === 1 ? 'guest' : 'guests'}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Amount</p>
-                <p className="text-lg font-semibold text-foreground">
-                  ₹{booking.total_amount.toLocaleString('en-IN')}
-                </p>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate(`/room/${booking.room_id}`)}
-                className="gap-1"
-              >
-                View Room
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    );
-  };
-
   const EmptyState = ({ message, icon: Icon }: { message: string; icon: typeof Calendar }) => (
-    <div className="text-center py-16">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="text-center py-16"
+    >
       <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
         <Icon className="w-8 h-8 text-muted-foreground" />
       </div>
@@ -264,7 +182,7 @@ export default function MyBookings() {
       >
         Browse Rooms
       </Button>
-    </div>
+    </motion.div>
   );
 
   return (
@@ -294,18 +212,30 @@ export default function MyBookings() {
             transition={{ delay: 0.1 }}
             className="grid grid-cols-3 gap-4 mb-8"
           >
-            <div className="bg-card rounded-xl border border-border p-4 text-center">
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="bg-card rounded-xl border border-border p-4 text-center cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => setActiveTab('upcoming')}
+            >
               <p className="text-2xl font-bold text-accent">{upcomingBookings.length}</p>
               <p className="text-sm text-muted-foreground">Upcoming</p>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-4 text-center">
+            </motion.div>
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="bg-card rounded-xl border border-border p-4 text-center cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => setActiveTab('past')}
+            >
               <p className="text-2xl font-bold text-foreground">{pastBookings.length}</p>
               <p className="text-sm text-muted-foreground">Completed</p>
-            </div>
-            <div className="bg-card rounded-xl border border-border p-4 text-center">
-              <p className="text-2xl font-bold text-muted-foreground">{bookings.length}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
-            </div>
+            </motion.div>
+            <motion.div 
+              whileHover={{ scale: 1.02 }}
+              className="bg-card rounded-xl border border-border p-4 text-center cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => setActiveTab('cancelled')}
+            >
+              <p className="text-2xl font-bold text-muted-foreground">{cancelledBookings.length}</p>
+              <p className="text-sm text-muted-foreground">Cancelled</p>
+            </motion.div>
           </motion.div>
 
           {/* Bookings Tabs */}
@@ -331,42 +261,60 @@ export default function MyBookings() {
               </TabsList>
 
               <TabsContent value="upcoming" className="space-y-4">
-                {upcomingBookings.length > 0 ? (
-                  upcomingBookings.map(booking => (
-                    <BookingCard key={booking.id} booking={booking} />
-                  ))
-                ) : (
-                  <EmptyState 
-                    message="No upcoming bookings. Ready to plan your next stay?" 
-                    icon={Calendar} 
-                  />
-                )}
+                <AnimatePresence mode="popLayout">
+                  {upcomingBookings.length > 0 ? (
+                    upcomingBookings.map(booking => (
+                      <BookingCard 
+                        key={booking.id} 
+                        booking={booking} 
+                        onCancelled={fetchBookings}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState 
+                      message="No upcoming bookings. Ready to plan your next stay?" 
+                      icon={Calendar} 
+                    />
+                  )}
+                </AnimatePresence>
               </TabsContent>
 
               <TabsContent value="past" className="space-y-4">
-                {pastBookings.length > 0 ? (
-                  pastBookings.map(booking => (
-                    <BookingCard key={booking.id} booking={booking} />
-                  ))
-                ) : (
-                  <EmptyState 
-                    message="No past bookings yet. Book your first stay!" 
-                    icon={Hotel} 
-                  />
-                )}
+                <AnimatePresence mode="popLayout">
+                  {pastBookings.length > 0 ? (
+                    pastBookings.map(booking => (
+                      <BookingCard 
+                        key={booking.id} 
+                        booking={booking} 
+                        onCancelled={fetchBookings}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState 
+                      message="No past bookings yet. Book your first stay!" 
+                      icon={Hotel} 
+                    />
+                  )}
+                </AnimatePresence>
               </TabsContent>
 
               <TabsContent value="cancelled" className="space-y-4">
-                {cancelledBookings.length > 0 ? (
-                  cancelledBookings.map(booking => (
-                    <BookingCard key={booking.id} booking={booking} />
-                  ))
-                ) : (
-                  <EmptyState 
-                    message="No cancelled bookings" 
-                    icon={AlertCircle} 
-                  />
-                )}
+                <AnimatePresence mode="popLayout">
+                  {cancelledBookings.length > 0 ? (
+                    cancelledBookings.map(booking => (
+                      <BookingCard 
+                        key={booking.id} 
+                        booking={booking} 
+                        onCancelled={fetchBookings}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState 
+                      message="No cancelled bookings" 
+                      icon={AlertCircle} 
+                    />
+                  )}
+                </AnimatePresence>
               </TabsContent>
             </Tabs>
           </motion.div>

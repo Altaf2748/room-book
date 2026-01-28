@@ -278,7 +278,20 @@ export default function Rooms() {
 
                 {/* Room Grid */}
                 {filteredRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 stagger-fade-in">
+                  <motion.div 
+                    className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      visible: {
+                        opacity: 1,
+                        transition: {
+                          staggerChildren: 0.08
+                        }
+                      }
+                    }}
+                  >
                     {filteredRooms.map((room) => {
                       const availability = roomAvailability.get(room.id);
                       const isBooked = availability ? !availability.isAvailable : false;
@@ -291,18 +304,32 @@ export default function Rooms() {
                       }
                       
                       return (
-                        <RoomCard
+                        <motion.div
                           key={room.id}
-                          room={room}
-                          selectedHours={searchParams.hours}
-                          onView={handleViewRoom}
-                          onBook={handleBookRoom}
-                          isBooked={isBooked}
-                          nextAvailableSlot={nextAvailableSlot}
-                        />
+                          variants={{
+                            hidden: { opacity: 0, y: 20 },
+                            visible: { 
+                              opacity: 1, 
+                              y: 0,
+                              transition: {
+                                duration: 0.4,
+                                ease: "easeOut"
+                              }
+                            }
+                          }}
+                        >
+                          <RoomCard
+                            room={room}
+                            selectedHours={searchParams.hours}
+                            onView={handleViewRoom}
+                            onBook={handleBookRoom}
+                            isBooked={isBooked}
+                            nextAvailableSlot={nextAvailableSlot}
+                          />
+                        </motion.div>
                       );
                     })}
-                  </div>
+                  </motion.div>
                 ) : (
                   <motion.div
                     initial={{ opacity: 0 }}

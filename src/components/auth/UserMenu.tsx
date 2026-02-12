@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, LogOut, Settings, Calendar, ChevronDown } from 'lucide-react';
+import { User, LogOut, Settings, Calendar, ChevronDown, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -84,6 +84,16 @@ export function UserMenu() {
                 >
                   <Calendar className="w-4 h-4 text-muted-foreground" />
                   My Bookings
+                </button>
+                <button
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted rounded-lg transition-colors"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate('/refund-tracking');
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 text-muted-foreground" />
+                  Refund Tracking
                 </button>
                 <button
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-foreground hover:bg-muted rounded-lg transition-colors"

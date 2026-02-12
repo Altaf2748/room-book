@@ -81,6 +81,17 @@ export function CancelBookingDialog({
   const handleCancel = async () => {
     setIsLoading(true);
     try {
+      // Get user profile for email
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error('User email not found');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .single();
+
+      // Update booking status
       const { error } = await supabase
         .from('bookings')
         .update({
@@ -90,6 +101,40 @@ export function CancelBookingDialog({
         .eq('id', booking.id);
 
       if (error) throw error;
+
+      // Send cancellation email
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-cancellation-email`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({
+              email: user.email,
+              guestName: profile?.full_name || 'Guest',
+              roomName,
+              bookingDate: booking.booking_date,
+              startTime: booking.start_time,
+              endTime: booking.end_time,
+              bookingId: booking.id,
+              depositPaid: booking.deposit_amount,
+              refundAmount,
+              refundPercentage,
+              policyMessage,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error('Failed to send cancellation email:', await response.text());
+        }
+      } catch (emailError) {
+        console.error('Error sending cancellation email:', emailError);
+        // Don't throw - email is optional, booking cancellation is primary
+      }
 
       toast({
         title: 'Booking Cancelled',
